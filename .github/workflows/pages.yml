@@ -1,0 +1,60 @@
+name: Update armory data in pages
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: 'pages'
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'yarn'
+      - name: Install dependencies
+        run: yarn install
+      - name: Download armory data
+        run: yarn run exec
+        env:
+          FEISHU_APP_ID: ${{ secrets.FEISHU_APP_ID }}
+          FEISHU_APP_SECRET: ${{ secrets.FEISHU_APP_SECRET }}
+          ARMORY_BITABLE: ${{ secrets.ARMORY_BITABLE }}
+          ARMORY_TABLE: ${{ secrets.ARMORY_TABLE }}
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: './docs'
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2
+      - name: Commit changes to armory.json
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: Updated by GitHub Actions
+          branch: dirty
+          file_pattern: 'docs/armory.json'
+          add_options: '-f'
+          push_options: '--force'
+          skip_dirty_check: true
+          create_branch: true
